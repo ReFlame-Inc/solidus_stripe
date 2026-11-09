@@ -10,7 +10,7 @@ bin/rails-new "$app_name"
 # Stay away from the bundler env of the containing extension.
 function unbundled {
   echo "~~> Running: $@"
-  ruby -rbundler -e'Bundler.with_unbundled_env {system *ARGV}' -- env BUNDLE_SUPPRESS_INSTALL_USING_MESSAGES=true "$@"
+  ruby -rbundler -e'Bundler.with_unbundled_env { exec(*ARGV) }' -- env BUNDLE_SUPPRESS_INSTALL_USING_MESSAGES=true "$@"
 }
 
 cd ./dummy-app

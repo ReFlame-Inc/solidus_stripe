@@ -3,10 +3,10 @@
 # Storefront spec copied from Solidus, retaining all upstream examples.
 # https://github.com/solidusio/solidus/blob/84f92a7871200144589d275655a26287054737fa/storefront/templates/spec/system/products_spec.rb
 
-require "solidus_storefront_spec_helper"
+require "support/solidus_stripe/storefront"
 
 RSpec.describe "Visiting Products", type: :system do
-  include SolidusStorefront::System::CheckoutHelpers
+  include StripeStorefrontCheckoutHelpers
 
   before {
     setup_custom_products
