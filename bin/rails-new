@@ -77,4 +77,6 @@ else
   git clone --depth 1 --branch "${SOLIDUS_BRANCH:-v4.7}" https://github.com/solidusio/solidus_starter_frontend.git tmp/starter-frontend
   export AUTO_ACCEPT=true
   unbundled bundle exec rails app:template LOCATION="$app_path/tmp/starter-frontend/template.rb"
+  # Tailwind emits modern CSS that the legacy SassC compressor cannot parse.
+  echo 'Rails.application.configure { config.assets.css_compressor = nil }' >> config/environments/test.rb
 fi
