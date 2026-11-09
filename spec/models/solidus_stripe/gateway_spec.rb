@@ -42,7 +42,8 @@ RSpec.describe SolidusStripe::Gateway do
       allow(payment.source).to receive(:stripe_payment_method).and_return(stripe_payment_method)
       allow(Stripe::PaymentIntent).to receive(:confirm).with(stripe_payment_intent.id).and_return(stripe_payment_intent)
 
-      result = gateway.authorize(123_45, payment.source, currency: 'USD', originator: order.payments.first)
+      payment.order.temporary_payment_source = true
+      result = gateway.authorize(123_45, payment.source, currency: 'USD', originator: payment)
 
       expect(Stripe::PaymentIntent).to have_received(:create).with(
         amount: 123_45,
@@ -51,7 +52,7 @@ RSpec.describe SolidusStripe::Gateway do
         confirm: false,
         payment_method: stripe_payment_method.id,
         payment_method_types: [stripe_payment_method.type],
-        metadata: { solidus_order_number: order.number },
+        metadata: { solidus_order_number: order.number, solidus_temporary_source: "true" },
         customer: "cus_123",
         setup_future_usage: nil
       )

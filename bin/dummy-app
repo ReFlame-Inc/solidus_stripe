@@ -10,7 +10,7 @@ bin/rails-new "$app_name"
 # Stay away from the bundler env of the containing extension.
 function unbundled {
   echo "~~> Running: $@"
-  ruby -rbundler -e'Bundler.with_unbundled_env {system *ARGV}' -- env BUNDLE_SUPPRESS_INSTALL_USING_MESSAGES=true "$@"
+  ruby -rbundler -e'Bundler.with_unbundled_env { exec(*ARGV) }' -- env BUNDLE_SUPPRESS_INSTALL_USING_MESSAGES=true "$@"
 }
 
 cd ./dummy-app
@@ -21,7 +21,23 @@ echo "gem 'rspec_junit_formatter', require: false" >> Gemfile
 echo "gem 'stripe-ruby-mock', group: :test" >> Gemfile
 echo "gem 'vcr', group: :test" >> Gemfile
 echo "gem 'webmock', group: :test" >> Gemfile
+if [[ -f spec/solidus_starter_frontend_spec_helper.rb ]]; then
+  echo "gem 'capybara-lockstep', group: :test" >> Gemfile
+  # Synchronize the legacy Selenium suite with outstanding Turbo requests.
+  ruby -i -pe 'sub(/<head>/, %q{<head><%= capybara_lockstep if defined?(Capybara::Lockstep) %>})' app/views/layouts/{application,storefront}.html.erb
+fi
 unbundled bundle install
 
 unbundled bundle add $extension_name --path ..
 unbundled bundle exec rails generate $extension_name:install --migrate --load-seeds=false --specs=all
+
+# Keep the storefront's own product specs. Limit the no-price lookup to the
+# named product so unrelated records cannot push it off the first page.
+ruby -i -pe 'if /it .lists products without a price./ .. /^  end/; sub(/visit products_path$/, %q{stub_spree_preferences(products_per_page: 1)
+    visit products_path(keywords: "Solidus hoodie")}); end' spec/system/products_spec.rb
+
+if [[ -f spec/solidus_starter_frontend_spec_helper.rb ]]; then
+  # Backport the cart cache fix and exercise navigation against the selected
+  # result and the authenticated cart in this generated legacy test app.
+  patch -p1 < ../bin/fixtures/legacy-storefront.patch
+fi

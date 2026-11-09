@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'stripe'
-require 'solidus_storefront_spec_helper'
+require 'support/solidus_stripe/storefront'
 require 'vcr'
 
 Dir["#{__dir__}/support/solidus_stripe/**/*.rb"].sort.each { |f| require f }

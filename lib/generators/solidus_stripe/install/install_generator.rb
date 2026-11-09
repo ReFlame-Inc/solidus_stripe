@@ -54,8 +54,9 @@ module SolidusStripe
       def install_solidus_storefront_support
         support_code_for(:storefront) do
           directory 'app', 'app'
+          stylesheet = %w[solidus_storefront solidus_starter_frontend].map { |name| "app/assets/stylesheets/#{name}.css" }.find { |path| File.file?(File.join(destination_root, path)) }
           inject_into_file(
-            'app/assets/stylesheets/solidus_storefront.css',
+            stylesheet,
             " *= require spree/frontend/solidus_stripe\n",
             before: %r{\*/},
             verbose: true,
@@ -81,6 +82,12 @@ module SolidusStripe
           end
 
           run 'bin/importmap pin @stripe/stripe-js'
+          manifest = 'app/assets/config/manifest.js'
+          manifest_path = File.join(destination_root, manifest)
+          directive = '//= link_tree ../../../vendor/javascript .js'
+          if File.file?(manifest_path) && !File.read(manifest_path).include?('link_tree ../../../vendor/javascript')
+            append_file manifest, "\n#{directive}\n"
+          end
         end
       end
 

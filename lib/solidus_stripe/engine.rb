@@ -29,6 +29,7 @@ module SolidusStripe
     end
 
     config.to_prepare do
+      Spree::Payment.prepend SolidusStripe::AsynchronousPayment unless Spree::Payment < SolidusStripe::AsynchronousPayment
       Spree::Order.prepend SolidusStripe::OrderPaymentFailure unless
         Spree::Order < SolidusStripe::OrderPaymentFailure
     end

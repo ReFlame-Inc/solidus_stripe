@@ -64,6 +64,23 @@ RSpec.describe 'Stripe wallet after ordinary checkout', type: :request do
     end
   end
 
+  context 'while an asynchronous purchase awaits settlement' do
+    let(:settings) { super().merge(auto_capture: true) }
+    let(:confirmed_fields) { super().merge(status: 'processing') }
+
+    it 'completes checkout once and leaves the payment processing on retry' do
+      submit_checkout
+      expect(order.reload).to be_completed
+      payment = order.payments.last
+      expect(payment).to be_processing
+      payment.process!
+      expect(payment.reload).to be_processing
+      expect(payment.capture_events).to be_empty
+      expect(Stripe::PaymentIntent).to have_received(:create).once
+      expect(Stripe::PaymentIntent).to have_received(:confirm).once
+    end
+  end
+
   ['on_session', 'off_session'].each do |future_usage|
     context "with #{future_usage}" do
       let(:settings) { super().merge(future_usage: future_usage) }

@@ -5,6 +5,10 @@ module SolidusStripe
     belongs_to :order, class_name: 'Spree::Order'
     belongs_to :payment_method, class_name: 'SolidusStripe::PaymentMethod'
 
+    def self.current_payment(order)
+      order.payments.where.not(state: %w[invalid void]).reorder(id: :desc).first
+    end
+
     def self.prepare_for_payment(payment, **stripe_creation_options)
       # Find or create the intent for the payment.
       intent = retrieve_for_payment(payment) || create_for_payment(payment, **stripe_creation_options)
@@ -31,6 +35,7 @@ module SolidusStripe
           intent.stripe_intent_id,
           payment_method: payment.source.stripe_payment_method_id,
           payment_method_types: [payment.source.stripe_payment_method.type],
+          metadata: { solidus_temporary_source: payment.order.temporary_payment_source ? "true" : "false" },
         )
       }
 
@@ -52,29 +57,33 @@ module SolidusStripe
 
     def process_payment
       locked_order = order
+      remote = reload.stripe_intent
       locked_order.with_lock do
-        reload
         return false unless order_id == locked_order.id
 
-        # Keep the locked order and transient checkout preferences after the
-        # intent reload clears its association cache.
         self.order = locked_order
-        payment = order.payments.where.not(state: %w[invalid void]).order(id: :desc).find_by!(
-          payment_method: payment_method,
-          response_code: stripe_intent.id,
-        )
+        payment = self.class.current_payment(locked_order)
+        return false unless payment && payment.payment_method_id == payment_method_id &&
+          payment.response_code == remote.id
 
-        return false unless stripe_intent.amount == stripe_order_amount &&
-          stripe_intent.currency == order.currency.downcase
+        return false unless remote.amount == stripe_order_amount &&
+          remote.currency == order.currency.downcase
 
-        return true if order.completed? && %w[succeeded requires_capture processing].include?(stripe_intent.status)
+        return %w[succeeded requires_capture processing].include?(remote.status) if order.completed?
+        return false unless order.confirm? || (order.payment? && !order.has_checkout_step?("confirm"))
+
+        # A settlement webhook may complete this payment while Stripe is being queried.
+        if payment.completed?
+          order.complete!
+          return true
+        end
 
         # A server-side attempt needing 3DS is marked failed by Solidus. The
         # authenticated return can retry only this order's matching payment.
         payment.update!(state: 'checkout') if payment.failed?
         payment.started_processing!
 
-        case stripe_intent.status
+        case remote.status
         when 'processing'
           successful = true
         when 'requires_capture'
@@ -91,8 +100,8 @@ module SolidusStripe
         SolidusStripe::LogEntries.payment_log(
           payment,
           success: successful,
-          message: I18n.t("solidus_stripe.intent_status.#{stripe_intent.status}"),
-          data: stripe_intent,
+          message: I18n.t("solidus_stripe.intent_status.#{remote.status}"),
+          data: remote,
         )
 
         if successful
@@ -131,7 +140,9 @@ module SolidusStripe
           customer: stripe_customer_id,
           payment_method: payment.source.stripe_payment_method_id,
           payment_method_types: [payment.source.stripe_payment_method.type],
-          metadata: { solidus_order_number: order.number },
+          metadata: { solidus_order_number: order.number }.tap { |metadata|
+            metadata[:solidus_temporary_source] = "true" if payment.order.temporary_payment_source
+          },
           **stripe_intent_options,
         })
       end

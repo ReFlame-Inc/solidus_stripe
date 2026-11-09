@@ -6,7 +6,7 @@ branch = ENV.fetch("SOLIDUS_BRANCH", "main")
 gem "solidus", github: "solidusio/solidus", branch: branch
 
 rails_version = ENV.fetch("RAILS_VERSION", "8.0")
-gem "rails", "~> #{rails_version}"
+gem "rails", "~> #{rails_version.split('.').length == 2 ? "#{rails_version}.0" : rails_version}"
 
 case ENV.fetch("DB", nil)
 when "mysql"

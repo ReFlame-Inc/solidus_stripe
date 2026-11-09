@@ -78,8 +78,8 @@
 </div>
 
 <% if !current_order.has_checkout_step?("confirm") %>
-  <% payment = current_order.payments.where(payment_method: payment_method).order(id: :desc).first %>
-  <% intent = SolidusStripe::PaymentIntent.find_by(order: current_order, payment_method: payment_method, stripe_intent_id: payment&.response_code) if payment&.response_code %>
+  <% payment = SolidusStripe::PaymentIntent.current_payment(current_order) %>
+  <% intent = SolidusStripe::PaymentIntent.find_by(order: current_order, payment_method: payment_method, stripe_intent_id: payment&.response_code) if payment&.payment_method_id == payment_method.id && payment.response_code %>
   <% if params[:stripe_authentication_failed].blank? && intent && intent.stripe_intent.status == 'requires_action' %>
     <input type="hidden"
       data-controller="solidus-stripe-confirm"

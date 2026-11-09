@@ -57,12 +57,7 @@ module SolidusStripe
 
       confirmed_intent = confirm_stripe_payment_intent(stripe_payment_intent.stripe_intent_id)
 
-      build_payment_log(
-        success: %w[requires_capture succeeded].include?(confirmed_intent.status),
-        message: I18n.t("solidus_stripe.intent_status.#{confirmed_intent.status}"),
-        response_code: confirmed_intent.id,
-        data: confirmed_intent
-      )
+      confirmation_response(confirmed_intent, %w[requires_capture succeeded])
     rescue Stripe::StripeError => e
       build_payment_log(
         success: false,
@@ -117,12 +112,7 @@ module SolidusStripe
 
       confirmed_intent = confirm_stripe_payment_intent(stripe_payment_intent.stripe_intent_id)
 
-      build_payment_log(
-        success: confirmed_intent.status == "succeeded",
-        message: I18n.t("solidus_stripe.intent_status.#{confirmed_intent.status}"),
-        response_code: confirmed_intent.id,
-        data: confirmed_intent,
-      )
+      confirmation_response(confirmed_intent, %w[succeeded])
     rescue Stripe::StripeError => e
       build_payment_log(
         success: false,
@@ -198,6 +188,18 @@ module SolidusStripe
     end
 
     private
+
+    def confirmation_response(intent, final_statuses)
+      processing = intent.status == "processing"
+      response = build_payment_log(
+        success: processing || final_statuses.include?(intent.status),
+        message: I18n.t("solidus_stripe.intent_status.#{intent.status}"),
+        response_code: intent.id,
+        data: intent
+      )
+      response.params["solidus_stripe_processing"] = true if processing
+      response
+    end
 
     def confirm_stripe_payment_intent(stripe_payment_intent_id)
       request { Stripe::PaymentIntent.confirm(stripe_payment_intent_id) }

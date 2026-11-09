@@ -1,0 +1,74 @@
+--- a/app/controllers/store_controller.rb
++++ b/app/controllers/store_controller.rb
+@@ -14,8 +14,9 @@
+   end
+ 
+   def cart_link
+-    render partial: 'shared/cart/link_to_cart'
+-    fresh_when(etag: current_order, template: 'shared/cart/_link_to_cart')
++    if stale?(etag: current_order, template: 'shared/cart/_link_to_cart')
++      render partial: 'shared/cart/link_to_cart'
++    end
+   end
+ 
+   private
+--- a/spec/requests/checkouts_spec.rb
++++ b/spec/requests/checkouts_spec.rb
+@@ -324,7 +324,7 @@
+ 
+       before do
+         allow(Spree::OrderUpdater).to receive(:new).and_return(updater_instance)
+-        allow(updater_instance).to receive(:update_payment_state).and_raise(Spree::Core::GatewayError.new('Invalid something or other.'))
++        allow(updater_instance).to receive(:recalculate_payment_state).and_raise(Spree::Core::GatewayError.new('Invalid something or other.'))
+         patch update_checkout_path(state: order.state, order: { bill_address_attributes: address_params })
+       end
+ 
+--- a/spec/system/authentication/checkout_spec.rb
++++ b/spec/system/authentication/checkout_spec.rb
+@@ -79,17 +79,20 @@
+       user = create(:user, email: 'email@person.com', password: 'password', password_confirmation: 'password')
+       click_link 'Solidus hoodie'
+       click_button 'Add To Cart'
++      expect(page).to have_current_path(cart_path)
+ 
+       visit login_path
+       fill_in 'Email', with: user.email
+       fill_in 'Password:', with: user.password
+       click_button 'Login'
++      expect(page).to have_text 'Logged in successfully'
+       click_link 'Cart'
+ 
+       expect(page).to have_text 'Solidus hoodie'
+       within('h1') { expect(page).to have_text 'Shopping Cart' }
+ 
+-      click_button 'Checkout'
++      find('#checkout-button-form #checkout-link').send_keys(:enter)
++      expect(page).to have_current_path(checkout_state_path('address'))
+ 
+       fill_addresses_fields_with(address)
+       click_button 'Save and Continue'
+--- a/spec/system/search_spec.rb
++++ b/spec/system/search_spec.rb
+@@ -42,16 +42,19 @@
+     fill_search_input_with 'Solidus'
+     wait_for_autocomplete
+ 
+-    find_all('[data-search-target="result"] a')[0].click
+-    expect(page).to have_current_path('/products/solidus-hoodie')
++    link = first('[data-search-target="result"] a')
++    expected_path = URI.parse(link[:href]).path
++    link.click
++    expect(page).to have_current_path(expected_path)
+   end
+ 
+   it 'clicks on a suggestion pressing enter' do
+     fill_search_input_with 'Solidus'
+     wait_for_autocomplete
++    expected_path = URI.parse(first('[data-search-target="result"] a')[:href]).path
+     find('input[name=keywords]').native.send_keys(:enter)
+ 
+-    expect(page).to have_current_path('/products/solidus-hoodie')
++    expect(page).to have_current_path(expected_path)
+   end
+ 
+   it 'closes autocomplete suggestions pressing esc key' do

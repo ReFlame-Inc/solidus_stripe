@@ -30,10 +30,10 @@ RSpec.describe '3DS return without confirm', type: :request do
     intent
   end
 
-  def stub_stripe(status, amount: intent.stripe_order_amount, setup_future_usage: nil, customer: nil, source_id: nil)
+  def stub_stripe(status, amount: intent.stripe_order_amount, setup_future_usage: nil, customer: nil, source_id: nil, metadata: {})
     allow(Stripe::PaymentIntent).to receive(:retrieve).with('pi_return').and_return(
       Stripe::PaymentIntent.construct_from(id: 'pi_return', status: status, amount: amount, currency: 'usd',
-        setup_future_usage: setup_future_usage, customer: customer, payment_method: source_id)
+        setup_future_usage: setup_future_usage, customer: customer, payment_method: source_id, metadata: metadata)
     )
   end
 
@@ -52,6 +52,14 @@ RSpec.describe '3DS return without confirm', type: :request do
     expect(order.reload.state).to eq('payment')
     expect(payment.reload.state).to eq('failed')
     expect(response).to redirect_to('/checkout/payment?stripe_authentication_failed=true')
+  end
+
+  it 'ignores the previous gateway after another payment attempt starts' do
+    create(:payment, order: order, payment_method: create(:solidus_stripe_payment_method))
+    stub_stripe('succeeded')
+    get "/solidus_stripe/#{payment_method.slug}/after_confirmation", params: { payment_intent: 'pi_return' }
+    expect(order.reload).not_to be_completed
+    expect(payment.reload).to be_failed
   end
 
   it 'rejects an amount different from the current order total' do
@@ -94,8 +102,11 @@ RSpec.describe '3DS return without confirm', type: :request do
     end
 
     it 'respects temporary sources after authentication' do
-      intent.order.temporary_payment_source = true
-      expect { expect(intent.process_payment).to be(true) }.not_to change(Spree::WalletPaymentSource, :count)
+      stub_stripe('requires_capture', setup_future_usage: 'off_session', customer: 'cus_return',
+        source_id: payment.source.stripe_payment_method_id, metadata: { solidus_temporary_source: 'true' })
+      expect {
+        get "/solidus_stripe/#{payment_method.slug}/after_confirmation", params: { payment_intent: 'pi_return' }
+      }.not_to change(Spree::WalletPaymentSource, :count)
       expect(order.reload).to be_completed
     end
 
