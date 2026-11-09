@@ -25,3 +25,14 @@ unbundled bundle install
 
 unbundled bundle add $extension_name --path ..
 unbundled bundle exec rails generate $extension_name:install --migrate --load-seeds=false --specs=all
+
+# Keep the storefront's own product specs. Limit the no-price lookup to the
+# named product so unrelated records cannot push it off the first page.
+ruby -i -pe 'if /it .lists products without a price./ .. /^  end/; sub(/visit products_path$/, %q{stub_spree_preferences(products_per_page: 1)
+    visit products_path(keywords: "Solidus hoodie")}); end' spec/system/products_spec.rb
+
+if [[ -f spec/solidus_starter_frontend_spec_helper.rb ]]; then
+  # The legacy spec injects a gateway exception via the old updater method.
+  # Core 4.7 calls recalculate_payment_state at the same checkout transition.
+  ruby -i -pe 'sub(/receive\(:update_payment_state\)\.and_raise/, "receive(:recalculate_payment_state).and_raise")' spec/requests/checkouts_spec.rb
+fi

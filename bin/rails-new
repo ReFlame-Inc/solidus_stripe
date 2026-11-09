@@ -72,6 +72,8 @@ install_options=(--auto-accept --payment-method=none --no-seed --no-sample)
 if [[ -f "$SOLIDUS_STOREFRONT_TEMPLATE" ]]; then
   unbundled bundle exec rails generate solidus:install "${install_options[@]}"
 else
+  # rails new --skip-bundle also skipped the Hotwire install hooks.
+  unbundled bundle exec rails turbo:install stimulus:install
   # Solidus 4.7 keeps its matching frontend in a separate repository.
   unbundled bundle exec rails generate solidus:install "${install_options[@]}" --frontend=none --authentication=devise
   git clone --depth 1 --branch "${SOLIDUS_BRANCH:-v4.7}" https://github.com/solidusio/solidus_starter_frontend.git tmp/starter-frontend
