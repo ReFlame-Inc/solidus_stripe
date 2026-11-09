@@ -66,3 +66,13 @@
    end
  
    it 'closes autocomplete suggestions pressing esc key' do
+--- a/app/views/carts/show.html.erb
++++ b/app/views/carts/show.html.erb
+@@ -23,6 +23,7 @@
+       <%= render 'orders/coupon_code' %>
+       <%= form_for @order, url: cart_path, html: {
+         id: 'checkout-button-form',
++        data: { turbo: false },
+       } do |order_form| %>
+         <%= render 'carts/cart_footer', order_form: order_form %>
+       <% end %>
