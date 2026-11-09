@@ -5,7 +5,7 @@ module SolidusStripe::OrderPaymentFailure
   # With confirm removed, a Stripe challenge must keep the order at payment.
   def payment_failed!(*args)
     if payment? && !has_checkout_step?("confirm") &&
-        payments.order(id: :desc).first&.payment_method.is_a?(SolidusStripe::PaymentMethod)
+        SolidusStripe::PaymentIntent.current_payment(self)&.payment_method.is_a?(SolidusStripe::PaymentMethod)
       true
     else
       super

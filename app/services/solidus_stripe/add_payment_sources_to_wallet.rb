@@ -34,6 +34,7 @@ module SolidusStripe
 
         intent = JSON.parse(response.params.fetch("data", "null"))
         intent.is_a?(Hash) &&
+          intent.dig("metadata", "solidus_temporary_source") != "true" &&
           intent["id"] == payment.response_code &&
           intent["payment_method"] == payment.source.stripe_payment_method_id &&
           intent["customer"] == customer.stripe_id &&

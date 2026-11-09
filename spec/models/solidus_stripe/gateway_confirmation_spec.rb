@@ -19,7 +19,7 @@ RSpec.describe SolidusStripe::Gateway do
         allow(Stripe::PaymentIntent).to receive(:confirm).and_return(confirmed)
 
         response = method.gateway.public_send(operation, 1000, payment.source, originator: payment)
-        expected_success = operation == :authorize ? %w[requires_capture succeeded].include?(status) : status == 'succeeded'
+        expected_success = operation == :authorize ? %w[processing requires_capture succeeded].include?(status) : %w[processing succeeded].include?(status)
         expect(response.success?).to eq(expected_success)
         expect(JSON.parse(response.params.fetch('data')).fetch('status')).to eq(status)
       end
