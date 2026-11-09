@@ -25,7 +25,7 @@
  
 --- a/spec/system/authentication/checkout_spec.rb
 +++ b/spec/system/authentication/checkout_spec.rb
-@@ -79,12 +79,14 @@
+@@ -79,17 +79,20 @@
        user = create(:user, email: 'email@person.com', password: 'password', password_confirmation: 'password')
        click_link 'Solidus hoodie'
        click_button 'Add To Cart'
@@ -35,12 +35,18 @@
        fill_in 'Email', with: user.email
        fill_in 'Password:', with: user.password
        click_button 'Login'
--      click_link 'Cart'
 +      expect(page).to have_text 'Logged in successfully'
-+      visit cart_path
+       click_link 'Cart'
  
        expect(page).to have_text 'Solidus hoodie'
        within('h1') { expect(page).to have_text 'Shopping Cart' }
+ 
+-      click_button 'Checkout'
++      find('#checkout-button-form #checkout-link').send_keys(:enter)
++      expect(page).to have_current_path(checkout_state_path('address'))
+ 
+       fill_addresses_fields_with(address)
+       click_button 'Save and Continue'
 --- a/spec/system/search_spec.rb
 +++ b/spec/system/search_spec.rb
 @@ -42,16 +42,19 @@
@@ -66,13 +72,3 @@
    end
  
    it 'closes autocomplete suggestions pressing esc key' do
---- a/app/views/carts/show.html.erb
-+++ b/app/views/carts/show.html.erb
-@@ -23,6 +23,7 @@
-       <%= render 'orders/coupon_code' %>
-       <%= form_for @order, url: cart_path, html: {
-         id: 'checkout-button-form',
-+        data: { turbo: false },
-       } do |order_form| %>
-         <%= render 'carts/cart_footer', order_form: order_form %>
-       <% end %>
