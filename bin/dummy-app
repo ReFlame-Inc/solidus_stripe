@@ -37,15 +37,7 @@ ruby -i -pe 'if /it .lists products without a price./ .. /^  end/; sub(/visit pr
     visit products_path(keywords: "Solidus hoodie")}); end' spec/system/products_spec.rb
 
 if [[ -f spec/solidus_starter_frontend_spec_helper.rb ]]; then
-  # Backport the conditional GET fix from the current storefront's cart_link.
-  ruby -0 -i -pe "sub(%q{render partial: 'shared/cart/link_to_cart'
-    fresh_when(etag: current_order, template: 'shared/cart/_link_to_cart')}, %q{if stale?(etag: current_order, template: 'shared/cart/_link_to_cart')
-      render partial: 'shared/cart/link_to_cart'
-    end})" app/controllers/store_controller.rb
-  # These two navigation examples assert the hoodie URL. The broad query
-  # 'Solidus' has several equally valid first results across DB engines.
-  ruby -i -pe "if /it '(allows mouse click on results|clicks on a suggestion pressing enter)'/ .. /^  end/; sub(/fill_search_input_with 'Solidus'/, %q{fill_search_input_with 'Solidus hoodie'}); end" spec/system/search_spec.rb
-  # The legacy spec injects a gateway exception via the old updater method.
-  # Core 4.7 calls recalculate_payment_state at the same checkout transition.
-  ruby -i -pe 'sub(/receive\(:update_payment_state\)\.and_raise/, "receive(:recalculate_payment_state).and_raise")' spec/requests/checkouts_spec.rb
+  # Backport the cart cache fix and exercise navigation against the selected
+  # result and the authenticated cart in this generated legacy test app.
+  patch -p1 < ../bin/fixtures/legacy-storefront.patch
 fi
