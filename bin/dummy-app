@@ -21,6 +21,11 @@ echo "gem 'rspec_junit_formatter', require: false" >> Gemfile
 echo "gem 'stripe-ruby-mock', group: :test" >> Gemfile
 echo "gem 'vcr', group: :test" >> Gemfile
 echo "gem 'webmock', group: :test" >> Gemfile
+if [[ -f spec/solidus_starter_frontend_spec_helper.rb ]]; then
+  echo "gem 'capybara-lockstep', group: :test" >> Gemfile
+  # Synchronize the legacy Selenium suite with outstanding Turbo requests.
+  ruby -i -pe 'sub(/<head>/, %q{<head><%= capybara_lockstep if defined?(Capybara::Lockstep) %>})' app/views/layouts/{application,storefront}.html.erb
+fi
 unbundled bundle install
 
 unbundled bundle add $extension_name --path ..
@@ -32,6 +37,11 @@ ruby -i -pe 'if /it .lists products without a price./ .. /^  end/; sub(/visit pr
     visit products_path(keywords: "Solidus hoodie")}); end' spec/system/products_spec.rb
 
 if [[ -f spec/solidus_starter_frontend_spec_helper.rb ]]; then
+  # Backport the conditional GET fix from the current storefront's cart_link.
+  ruby -0 -i -pe "sub(%q{render partial: 'shared/cart/link_to_cart'
+    fresh_when(etag: current_order, template: 'shared/cart/_link_to_cart')}, %q{if stale?(etag: current_order, template: 'shared/cart/_link_to_cart')
+      render partial: 'shared/cart/link_to_cart'
+    end})" app/controllers/store_controller.rb
   # The legacy spec injects a gateway exception via the old updater method.
   # Core 4.7 calls recalculate_payment_state at the same checkout transition.
   ruby -i -pe 'sub(/receive\(:update_payment_state\)\.and_raise/, "receive(:recalculate_payment_state).and_raise")' spec/requests/checkouts_spec.rb
