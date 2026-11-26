@@ -30,16 +30,16 @@
       layout: "tabs",
       defaultValues: {
         billingDetails: {
-          name: bill_address.name,
+          name: bill_address&.name,
           email: current_order.email,
-          phone: bill_address.phone,
+          phone: bill_address&.phone,
           address: {
-            line1: bill_address.address1,
-            line2: bill_address.address2,
-            city: bill_address.city,
-            state: bill_address.state.abbr,
-            country: bill_address.country.iso,
-            postal_code: bill_address.zipcode,
+            line1: bill_address&.address1,
+            line2: bill_address&.address2,
+            city: bill_address&.city,
+            state: bill_address&.state&.abbr || bill_address&.state_name,
+            country: bill_address&.country&.iso,
+            postal_code: bill_address&.zipcode,
           }
         }
       },
@@ -77,16 +77,13 @@
   </div>
 </div>
 
-<% if !current_order.has_checkout_step?("confirm") %>
-  <% payment = SolidusStripe::PaymentIntent.current_payment(current_order) %>
-  <% intent = SolidusStripe::PaymentIntent.find_by(order: current_order, payment_method: payment_method, stripe_intent_id: payment&.response_code) if payment&.payment_method_id == payment_method.id && payment.response_code %>
-  <% if params[:stripe_authentication_failed].blank? && intent && intent.stripe_intent.status == 'requires_action' %>
-    <input type="hidden"
-      data-controller="solidus-stripe-confirm"
-      data-solidus-stripe-confirm-automatic-value="true"
-      data-solidus-stripe-confirm-publishable-key-value="<%= payment_method.preferred_publishable_key %>"
-      data-solidus-stripe-confirm-client-secret-value="<%= intent.stripe_intent.client_secret %>"
-      data-solidus-stripe-confirm-return-url-value="<%= solidus_stripe.after_confirmation_url(payment_method.slug) %>"
-      data-solidus-stripe-confirm-error-base-url-value="<%= solidus_stripe.after_confirmation_url(payment_method.slug, payment_intent: intent.stripe_intent_id) %>">
-  <% end %>
+<% if params[:stripe_authentication_failed].blank? &&
+      (intent = SolidusStripe::PaymentIntent.pending_authentication_for(order: current_order, payment_method: payment_method)) %>
+  <input type="hidden"
+    data-controller="solidus-stripe-confirm"
+    data-solidus-stripe-confirm-automatic-value="true"
+    data-solidus-stripe-confirm-publishable-key-value="<%= payment_method.preferred_publishable_key %>"
+    data-solidus-stripe-confirm-client-secret-value="<%= intent.stripe_intent.client_secret %>"
+    data-solidus-stripe-confirm-return-url-value="<%= solidus_stripe.after_confirmation_url(payment_method.slug) %>"
+    data-solidus-stripe-confirm-error-base-url-value="<%= solidus_stripe.after_confirmation_url(payment_method.slug, payment_intent: intent.stripe_intent_id) %>">
 <% end %>

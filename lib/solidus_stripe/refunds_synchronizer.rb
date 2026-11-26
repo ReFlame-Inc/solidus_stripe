@@ -51,7 +51,9 @@ module SolidusStripe
 
     # @param stripe_payment_intent_id [String]
     def call(stripe_payment_intent_id)
-      payment = @payment_method.payments.find_by!(response_code: stripe_payment_intent_id)
+      scope = @payment_method.payments.where(response_code: stripe_payment_intent_id)
+      payment = scope.where.not(state: %w[failed invalid void]).reorder(id: :desc).first ||
+                scope.reorder(id: :desc).first!
 
       stripe_refunds(stripe_payment_intent_id)
         .select { stripe_refund_needs_sync?(_1) }

@@ -125,4 +125,43 @@ RSpec.describe '3DS return without confirm', type: :request do
       expect(user.wallet_payment_sources.reload).to be_empty
     end
   end
+
+  it 'does not auto-mount 3DS when the intent amount no longer matches the order total' do
+    stub_stripe('requires_action', amount: intent.stripe_order_amount + 100)
+    get '/checkout/payment'
+    expect(response).to have_http_status(:ok)
+    expect(response.body).not_to include('data-solidus-stripe-confirm-automatic-value="true"')
+  end
+
+  it 'redirects to the completed order on duplicate after_confirmation without creating a new cart' do
+    stub_stripe('succeeded')
+    get "/solidus_stripe/#{payment_method.slug}/after_confirmation", params: { payment_intent: 'pi_return' }
+    expect(response).to redirect_to("/orders/#{order.number}")
+    expect(order.reload).to be_completed
+
+    expect {
+      get "/solidus_stripe/#{payment_method.slug}/after_confirmation", params: { payment_intent: 'pi_return' }
+    }.not_to change(Spree::Order, :count)
+    expect(response).to redirect_to("/orders/#{order.number}")
+  end
+
+  it 'preserves the captured payment and redirects to cart when stock runs out during 3DS' do
+    stub_stripe('succeeded')
+    allow_any_instance_of(Spree::Order).to receive(:complete!).and_raise(Spree::Order::InsufficientStock)
+
+    get "/solidus_stripe/#{payment_method.slug}/after_confirmation", params: { payment_intent: 'pi_return' }
+
+    expect(response).to redirect_to('/cart')
+    expect(order.reload).not_to be_completed
+    expect(payment.reload.state).to eq('completed')
+  end
+
+  it 'handles Stripe API errors gracefully on after_confirmation' do
+    allow(Stripe::PaymentIntent).to receive(:retrieve).with('pi_return').and_raise(Stripe::APIConnectionError.new('timeout'))
+
+    get "/solidus_stripe/#{payment_method.slug}/after_confirmation", params: { payment_intent: 'pi_return' }
+
+    expect(response).to redirect_to('/checkout/payment?stripe_authentication_failed=true')
+    expect(order.reload).not_to be_completed
+  end
 end

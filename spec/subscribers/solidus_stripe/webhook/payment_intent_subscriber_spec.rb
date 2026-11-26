@@ -293,5 +293,22 @@ RSpec.describe SolidusStripe::Webhook::PaymentIntentSubscriber do
       expect(payment.reload.state).to eq "void"
       expect(payment.log_entries.count).to be(0)
     end
+
+    it "does nothing if the payment is already failed" do
+      payment_method = create(:solidus_stripe_payment_method)
+      stripe_payment_intent = Stripe::PaymentIntent.construct_from(id: "pi_failed_cancel", cancellation_reason: "abandoned")
+      payment = create(:payment,
+        payment_method: payment_method,
+        response_code: stripe_payment_intent.id,
+        state: "failed")
+      event = SolidusStripe::Webhook::EventWithContextFactory.from_object(
+        payment_method: payment_method,
+        object: stripe_payment_intent,
+        type: "payment_intent.canceled"
+      ).solidus_stripe_object
+
+      expect { described_class.new.void_payment(event) }.not_to raise_error
+      expect(payment.reload.state).to eq "failed"
+    end
   end
 end

@@ -16,6 +16,7 @@ module SolidusStripe
       # /!\ This list must be kept in sync with the list of events in the README
       CORE_EVENTS = Set[*%i[
         payment_intent.succeeded
+        payment_intent.amount_capturable_updated
         payment_intent.payment_failed
         payment_intent.canceled
         charge.refunded
