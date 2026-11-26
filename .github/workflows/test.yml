@@ -19,8 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rails_version: ["8.0", "7.2"]
-        ruby_version: ["3.4", "4.0"]
+        rails_version: ["8.1"]
+        ruby_version: ["4.0"]
         solidus_branch: ["v4.8"]
         database: ["postgresql", "mysql", "sqlite"]
     env:
