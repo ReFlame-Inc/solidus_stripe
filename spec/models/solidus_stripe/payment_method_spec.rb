@@ -98,6 +98,7 @@ RSpec.describe SolidusStripe::PaymentMethod do
       user.wallet.add(payment_source)
 
       expect(payment_method.previous_sources(order)).to eq [payment_source]
+      expect(payment_method.reusable_sources(order)).to eq [payment_source]
     end
   end
 
