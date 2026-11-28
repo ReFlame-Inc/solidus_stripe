@@ -3,6 +3,38 @@
 require 'stripe'
 require 'support/solidus_stripe/storefront'
 require 'vcr'
+require 'capybara/selenium/driver_specializations/chrome_driver'
+require 'uri'
+
+module Chrome158CdpStorageClearCompat
+  def execute_cdp(cmd, params = {})
+    super
+  rescue Selenium::WebDriver::Error::InvalidArgumentError
+    raise unless cmd == 'Storage.clearDataForOrigin' && params[:origin] == '*'
+
+    execute_cdp('Network.clearBrowserCookies')
+    if params[:storageTypes].to_s.include?('local_storage')
+      entries = execute_cdp('Page.getNavigationHistory').fetch('entries', [])
+      entries.filter_map { |entry| http_origin_for(entry['url']) }.uniq.each do |origin|
+        execute_cdp('Storage.clearDataForOrigin', origin: origin, storageTypes: 'local_storage')
+      end
+    end
+  end
+
+  private
+
+  def http_origin_for(url)
+    uri = URI.parse(url.to_s)
+    return unless %w[http https].include?(uri.scheme) && uri.host
+
+    port_part = uri.port == uri.default_port ? '' : ":#{uri.port}"
+    "#{uri.scheme}://#{uri.host}#{port_part}"
+  rescue URI::InvalidURIError
+    nil
+  end
+end
+
+Capybara::Selenium::Driver::ChromeDriver.prepend(Chrome158CdpStorageClearCompat)
 
 Dir["#{__dir__}/support/solidus_stripe/**/*.rb"].sort.each { |f| require f }
 

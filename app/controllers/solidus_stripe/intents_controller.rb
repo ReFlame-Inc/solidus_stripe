@@ -36,7 +36,8 @@ class SolidusStripe::IntentsController < Spree::BaseController
     if intent.process_payment
       redirect_to_completed_order(order)
     else
-      flash[:error] = params[:error_message] || t('spree.payment_processing_failed')
+      stripe_error_message = intent.stripe_intent.try(:last_payment_error)&.try(:message).presence
+      flash[:error] = stripe_error_message || t('spree.payment_processing_failed')
       redirect_to(main_app.checkout_state_path(:payment, stripe_authentication_failed: true))
     end
   end

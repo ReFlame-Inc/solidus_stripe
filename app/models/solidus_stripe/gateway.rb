@@ -76,14 +76,15 @@ module SolidusStripe
       check_given_amount_matches_payment_intent(amount_in_cents, options)
       check_stripe_payment_intent_id(stripe_payment_intent_id)
 
-      stripe_payment_intent = capture_stripe_payment_intent(stripe_payment_intent_id, amount_in_cents)
+      stripe_amount = to_stripe_amount(amount_in_cents, options[:originator].currency).to_i
+      stripe_payment_intent = capture_stripe_payment_intent(stripe_payment_intent_id, stripe_amount)
       build_payment_log(
         success: true,
         message: "PaymentIntent was confirmed successfully",
         response_code: stripe_payment_intent.id,
         data: stripe_payment_intent,
       )
-    rescue Stripe::InvalidRequestError => e
+    rescue Stripe::StripeError => e
       build_payment_log(
         success: false,
         message: e.to_s,
@@ -170,6 +171,12 @@ module SolidusStripe
         response_code: stripe_refund.id,
         data: stripe_refund,
       )
+    rescue Stripe::StripeError => e
+      build_payment_log(
+        success: false,
+        message: e.to_s,
+        data: e.response,
+      )
     end
 
     # Send a request to stripe using the current api keys but ignoring
@@ -206,7 +213,7 @@ module SolidusStripe
     end
 
     def capture_stripe_payment_intent(stripe_payment_intent_id, amount)
-      request { Stripe::PaymentIntent.capture(stripe_payment_intent_id, amount: amount) }
+      request { Stripe::PaymentIntent.capture(stripe_payment_intent_id, amount_to_capture: amount) }
     end
 
     def check_given_amount_matches_payment_intent(amount_in_cents, options)
