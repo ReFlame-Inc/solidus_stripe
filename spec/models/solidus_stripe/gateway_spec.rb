@@ -111,8 +111,21 @@ RSpec.describe SolidusStripe::Gateway do
 
       result = gateway.capture(123_45, "pi_123", originator: payment)
 
-      expect(Stripe::PaymentIntent).to have_received(:capture).with('pi_123', { amount: 12_345 })
+      expect(Stripe::PaymentIntent).to have_received(:capture).with('pi_123', { amount_to_capture: 12_345 })
       expect(result.params).to eq("data" => '{"id":"pi_123"}')
+    end
+
+    it 'converts special currency subunits via to_stripe_amount when capturing' do
+      stripe_payment_intent = Stripe::PaymentIntent.construct_from(id: "pi_huf")
+      gateway = build(:solidus_stripe_payment_method).gateway
+      order = build(:order, currency: 'HUF')
+      payment = build(:payment, order: order, response_code: "pi_huf", amount: 12_345)
+
+      allow(Stripe::PaymentIntent).to receive(:capture).and_return(stripe_payment_intent)
+
+      gateway.capture(12_345, "pi_huf", originator: payment)
+
+      expect(Stripe::PaymentIntent).to have_received(:capture).with('pi_huf', { amount_to_capture: 12_345_00 })
     end
 
     it "raises if the given amount doesn't match the order total" do
@@ -277,6 +290,20 @@ RSpec.describe SolidusStripe::Gateway do
         metadata: { solidus_skip_sync: 'true' }
       )
       expect(result.params).to eq("data" => '{"id":"re_123"}')
+    end
+
+    it 'returns a failed payment log instead of raising on StripeError' do
+      gateway = build(:solidus_stripe_payment_method).gateway
+      payment = instance_double(Spree::Payment, response_code: 'pi_123', currency: "USD")
+      allow(Stripe::Refund).to receive(:create).and_raise(Stripe::StripeError.new("refund failed"))
+
+      result = gateway.credit(123_45, 'pi_123', currency: 'USD', originator: instance_double(
+        Spree::Refund,
+        payment: payment
+      ))
+
+      expect(result.success?).to be(false)
+      expect(result.message).to include("refund failed")
     end
 
     it "raises if no stripe_payment_intent_id is given" do

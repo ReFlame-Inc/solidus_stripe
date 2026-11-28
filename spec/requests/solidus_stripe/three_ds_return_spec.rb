@@ -79,8 +79,10 @@ RSpec.describe '3DS return without confirm', type: :request do
   it 'keeps a canceled challenge retryable without automatically reopening it' do
     stub_stripe('requires_action')
     get "/solidus_stripe/#{payment_method.slug}/after_confirmation",
-      params: { payment_intent: 'pi_return', error_message: 'Authentication canceled' }
+      params: { payment_intent: 'pi_return', error_message: 'Spoofed phishing text' }
     expect(response).to redirect_to('/checkout/payment?stripe_authentication_failed=true')
+    expect(flash[:error]).to eq(I18n.t('spree.payment_processing_failed'))
+    expect(flash[:error]).not_to include('Spoofed phishing text')
     follow_redirect!
     expect(response.body).not_to include('data-solidus-stripe-confirm-automatic-value="true"')
     expect(order.reload.state).to eq('payment')
